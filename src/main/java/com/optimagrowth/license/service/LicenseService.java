@@ -1,51 +1,59 @@
 package com.optimagrowth.license.service;
 
 import com.optimagrowth.license.model.License;
+import com.optimagrowth.license.repository.LicenseRepository;
+import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.RequestHeader;
 
 import java.util.Locale;
-import java.util.Random;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+//@NoArgsConstructor
 public class LicenseService {
 
-    private final MessageSource messages;
+
+    @Qualifier("messageSource")
+    MessageSource messages;
+
+    private final LicenseRepository licenseRepository;
+
+    private final ServiceConfig config;
+
+
 
     public License getLicense(String licenseId, String organization){
-        return License.builder()
-                .id(new Random().nextInt(100))
-                .licenseId(licenseId)
-                .organizationId(organization)
-                .description("Software product")
-                .productName("Ostock")
-                .licenseType("full")
-                .build();
+        License license = licenseRepository.findByOrganizationIdAndLicenseId(organization, licenseId);
+
+        if(null == license)
+            throw new IllegalArgumentException(String.format(messages.getMessage("license.search.error.message", null, null), licenseId, organization));
+
+        return license.withComment(config.getProperty());
     }
 
-    public String createLicense(License license, String organizationId, Locale locale){
-        String responseMessage = null;
-        if (!StringUtils.isEmpty(license)){
-            license.setOrganizationId(organizationId);
-            responseMessage = String.format(messages.getMessage("license.create.message", null, locale), license.toString());
-        }
-        return responseMessage;
+    public License createLicense(License license, String organizationId, Locale locale){
+        license.setLicenseId(UUID.randomUUID().toString());
+        licenseRepository.save(license);
+        return license.withComment(config.getProperty());
     }
 
     public String deleteLicense(String licenseId, String organizationId){
-        return String.format("Deleting license with id %s for the organization %s", licenseId, organizationId);
+        String responseMessage = null;
+        License license = new License();
+        license.setLicenseId(licenseId);
+        licenseRepository.delete(license);
+        responseMessage = String.format(messages.getMessage("license.delete.message", null, null), licenseId);
+        return responseMessage;
     }
 
-    public String updateLicesnse(License license, String organizationId) {
-        String responseMessage = null;
-        if(license != null){
-            license.setOrganizationId(organizationId);
-            responseMessage = String.format("This is the put and the object is: %s", license.toString());
-        }
-        return responseMessage;
+    public License updateLicesnse(License license, String organizationId) {
+        licenseRepository.save(license);
+        return license.withComment(config.getProperty());
     }
 }
